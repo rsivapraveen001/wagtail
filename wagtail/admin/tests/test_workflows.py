@@ -139,11 +139,6 @@ class TestWorkflowsEditView(TestCase, WagtailTestUtils):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'wagtailadmin/workflows/edit.html')
 
-        # Test that the form contains options for the active tasks, but not the inactive task
-        self.assertContains(response, "first_task")
-        self.assertContains(response, "second_task")
-        self.assertNotContains(response, "inactive_task")
-
         # Check that the list of pages has the page to which this workflow is assigned
         self.assertContains(response, self.page.title)
 
