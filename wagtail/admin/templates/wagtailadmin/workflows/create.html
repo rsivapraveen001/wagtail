@@ -6,6 +6,7 @@
 {% block extra_css %}
     {% include "wagtailadmin/pages/_editor_css.html" %}
     {{ edit_handler.form.media.css }}
+    {{ pages_formset.media.css }}
 
     {{ view.media.css }}
 {% endblock %}
@@ -13,6 +14,7 @@
 {% block extra_js %}
     {% include "wagtailadmin/pages/_editor_js.html" %}
     {{ edit_handler.form.media.js }}
+    {{ pages_formset.media.js }}
     {{ edit_handler.html_declarations }}
 
     {{ view.media.js }}
@@ -26,6 +28,21 @@
         {% csrf_token %}
 
         {% block form %}{{ edit_handler.render_form_content }}{% endblock %}
+
+        <ul class="objects">
+            <li class="object">
+                <div class="title-wrapper">
+                    <label>
+                        Assign your workflow to pages
+                    </label>
+                </div>
+                <div class="object-layout">
+                    <div class="object-layout_big-part">
+                        {% include "wagtailadmin/workflows/includes/workflow_pages_formset.html" with formset=pages_formset %}
+                    </div>
+                </div>
+            </li>
+        </ul>
 
         {% block footer %}
             <footer role="contentinfo">

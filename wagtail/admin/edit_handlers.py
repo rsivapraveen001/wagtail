@@ -812,13 +812,13 @@ Page.base_form_class = WagtailAdminPageForm
 
 # Similarly, set up wagtailcore.Workflow to have edit handlers
 Workflow.panels = [
-    FieldPanel("name", heading=gettext_lazy("Give your workflow a name")),
+    FieldPanel("name", heading=gettext_lazy("Give your workflow a name"), classname="full title"),
     InlinePanel("workflow_tasks", heading=gettext_lazy("Add tasks to your workflow")),
 ]
 Task.panels = [
-    FieldPanel("name", heading=gettext_lazy("Give your task a name")),
+    FieldPanel("name", heading=gettext_lazy("Give your task a name"), classname="full title"),
 ]
-GroupApprovalTask.panels = Task.panels + [FieldPanel('groups', heading=gettext_lazy("Choose approval groups"))]
+GroupApprovalTask.panels = Task.panels + [FieldPanel('groups', heading=gettext_lazy("Choose approval groups"), widget=forms.CheckboxSelectMultiple)]
 # do not allow editing of group post creation - this could lead to confusing history if a group is changed after tasks
 # are started/completed
 GroupApprovalTask.exclude_on_edit = {'groups'}

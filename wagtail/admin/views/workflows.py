@@ -1,8 +1,10 @@
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.functional import cached_property
 from django.utils.http import is_safe_url
@@ -11,13 +13,20 @@ from django.utils.translation import ngettext
 from django.views.decorators.http import require_POST
 
 from wagtail.admin import messages
+from wagtail.admin.auth import PermissionPolicyChecker
 from wagtail.admin.edit_handlers import Workflow
-from wagtail.admin.forms.workflows import AddWorkflowToPageForm
+from wagtail.admin.forms.search import SearchForm
+from wagtail.admin.forms.workflows import AddWorkflowToPageForm, WorkflowPagesFormSet
+from wagtail.admin.modal_workflow import render_modal_workflow
 from wagtail.admin.views.generic import CreateView, DeleteView, EditView, IndexView
 from wagtail.admin.views.pages import get_valid_next_url_from_request
 from wagtail.core.models import Page, Task, TaskState, WorkflowState
 from wagtail.core.permissions import task_permission_policy, workflow_permission_policy
+from wagtail.core.utils import resolve_model_string
 from wagtail.core.workflows import get_task_types
+
+
+task_permission_checker = PermissionPolicyChecker(task_permission_policy)
 
 
 class Index(IndexView):
@@ -28,7 +37,7 @@ class Index(IndexView):
     add_url_name = 'wagtailadmin_workflows:add'
     edit_url_name = 'wagtailadmin_workflows:edit'
     page_title = _("Workflows")
-    add_item_label = _("Create a new workflow")
+    add_item_label = _("Add a workflow")
     header_icon = 'clipboard-list'
 
     def get_queryset(self):
@@ -62,17 +71,52 @@ class Create(CreateView):
         return self.edit_handler
 
     def get_form_class(self):
-        return self.get_edit_handler().get_form_class()
+        form_class = self.get_edit_handler().get_form_class()
+
+        # TODO Unhack
+        from wagtail.admin.widgets.workflows import AdminTaskChooser
+        form_class.formsets['workflow_tasks'].form.base_fields['task'].widget = AdminTaskChooser(show_clear_link=False)
+
+        return form_class
 
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
         self.edit_handler = self.edit_handler.bind_to(form=form)
         return form
 
+    def get_pages_formset(self):
+        if self.request.method == 'POST':
+            return WorkflowPagesFormSet(self.request.POST, instance=self.object, prefix='pages')
+        else:
+            return WorkflowPagesFormSet(instance=self.object, prefix='pages')
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['edit_handler'] = self.edit_handler
+        context['pages_formset'] = self.get_pages_formset()
         return context
+
+    def form_valid(self, form):
+        self.form = form
+
+        with transaction.atomic():
+            self.object = self.save_instance()
+
+            pages_formset = self.get_pages_formset()
+            if pages_formset.is_valid():
+                pages_formset.save()
+
+                success_message = self.get_success_message(self.object)
+                if success_message is not None:
+                    messages.success(self.request, success_message, buttons=[
+                        messages.button(reverse(self.edit_url_name, args=(self.object.id,)), _('Edit'))
+                    ])
+                return redirect(self.get_success_url())
+
+            else:
+                transaction.set_rollback(True)
+
+        return self.form_invalid(form)
 
 
 class Edit(EditView):
@@ -99,12 +143,24 @@ class Edit(EditView):
         return self.edit_handler
 
     def get_form_class(self):
-        return self.get_edit_handler().get_form_class()
+        form_class = self.get_edit_handler().get_form_class()
+
+        # TODO Unhack
+        from wagtail.admin.widgets.workflows import AdminTaskChooser
+        form_class.formsets['workflow_tasks'].form.base_fields['task'].widget = AdminTaskChooser(show_clear_link=False)
+
+        return form_class
 
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
         self.edit_handler = self.edit_handler.bind_to(form=form)
         return form
+
+    def get_pages_formset(self):
+        if self.request.method == 'POST':
+            return WorkflowPagesFormSet(self.request.POST, instance=self.get_object(), prefix='pages')
+        else:
+            return WorkflowPagesFormSet(instance=self.get_object(), prefix='pages')
 
     def get_paginated_pages(self):
         # Get the (paginated) list of Pages to which this Workflow is assigned.
@@ -118,6 +174,7 @@ class Edit(EditView):
         context = super().get_context_data(**kwargs)
         context['edit_handler'] = self.edit_handler
         context['pages'] = self.get_paginated_pages()
+        context['pages_formset'] = self.get_pages_formset()
         context['can_disable'] = (self.permission_policy is None or self.permission_policy.user_has_permission(self.request.user, 'delete')) and self.object.active
         context['can_enable'] = (self.permission_policy is None or self.permission_policy.user_has_permission(
             self.request.user, 'create')) and not self.object.active
@@ -126,6 +183,28 @@ class Edit(EditView):
     @property
     def get_enable_url(self):
         return reverse(self.enable_url_name, args=(self.object.pk,))
+
+    @transaction.atomic()
+    def form_valid(self, form):
+        self.form = form
+
+        with transaction.atomic():
+            self.object = self.save_instance()
+
+            pages_formset = self.get_pages_formset()
+            if pages_formset.is_valid():
+                pages_formset.save()
+
+                success_message = self.get_success_message()
+                if success_message is not None:
+                    messages.success(self.request, success_message, buttons=[
+                        messages.button(reverse(self.edit_url_name, args=(self.object.id,)), _('Edit'))
+                    ])
+                return redirect(self.get_success_url())
+            else:
+                transaction.set_rollback(True)
+
+        return self.form_invalid(form)
 
 
 class Disable(DeleteView):
@@ -452,3 +531,156 @@ def enable_task(request, pk):
         return redirect(redirect_to)
     else:
         return redirect('wagtailadmin_workflows:edit_task', task.id)
+
+
+def get_chooser_context():
+    """construct context variables needed by the chooser JS"""
+    return {
+        'step': 'chooser',
+        'error_label': _("Server Error"),
+        'error_message': _("Report this error to your webmaster with the following information:"),
+        'tag_autocomplete_url': reverse('wagtailadmin_tag_autocomplete'),
+    }
+
+
+def get_task_result_data(task):
+    """
+    helper function: given a task, return the json data to pass back to the
+    chooser panel
+    """
+
+    return {
+        'id': task.id,
+        'name': task.name,
+        'edit_url': reverse('wagtailadmin_workflows:task_edit', args=[task.id]),
+    }
+
+
+def task_chooser(request):
+    if task_permission_policy.user_has_permission(request.user, 'add'):
+        task_types = [
+            (model.get_verbose_name(), model._meta.app_label, model._meta.model_name)
+            for model in get_task_types()
+        ]
+        # sort by lower-cased version of verbose name
+        task_types.sort(key=lambda task_type: task_type[0].lower())
+    else:
+        task_types = []
+
+    if len(task_types) == 1:
+        create_model = get_task_types()[0]
+
+    elif 'create_model' in request.GET:
+        create_model = resolve_model_string(request.GET['create_model'])
+
+    else:
+        create_model = None
+
+    if create_model:
+        edit_handler = create_model.get_edit_handler()
+        edit_handler = edit_handler.bind_to(request=request)
+        createform_class = edit_handler.get_form_class()
+    else:
+        createform_class = None
+
+    tasks = Task.objects.all()
+
+    # TODO
+    #  # allow hooks to modify the queryset
+    # for hook in hooks.get_hooks('construct_document_chooser_queryset'):
+    #     documents = hook(documents, request)
+
+    q = None
+    if 'q' in request.GET or 'p' in request.GET:
+        searchform = SearchForm(request.GET)
+        if searchform.is_valid():
+            q = searchform.cleaned_data['q']
+
+            tasks = tasks.search(q)
+            is_searching = True
+        else:
+            tasks = tasks.order_by('name')
+            is_searching = False
+
+        # Pagination
+        paginator = Paginator(tasks, per_page=10)
+        tasks = paginator.get_page(request.GET.get('p'))
+
+        return TemplateResponse(request, "wagtailadmin/workflows/task_chooser/includes/results.html", {
+            'task_types': task_types,
+            'tasks': tasks,
+            'query_string': q,
+            'is_searching': is_searching,
+        })
+    else:
+        if createform_class:
+            if request.method == 'POST':
+                createform = createform_class(request.POST, request.FILES, prefix='create-task')
+
+                if createform.is_valid():
+                    task = createform.save()
+
+                    return render_modal_workflow(
+                        request, None, None,
+                        None, json_data={'step': 'task_chosen', 'result': get_task_result_data(task)}
+                    )
+            else:
+                createform = createform_class(prefix='create-task')
+        else:
+            createform = None
+
+        searchform = SearchForm()
+
+        tasks = tasks.order_by('-name')
+        paginator = Paginator(tasks, per_page=10)
+        tasks = paginator.get_page(request.GET.get('p'))
+
+        return render_modal_workflow(request, 'wagtailadmin/workflows/task_chooser/chooser.html', None, {
+            'task_types': task_types,
+            'tasks': tasks,
+            'searchform': searchform,
+            'createform': createform,
+            'is_searching': False,
+            'add_url': reverse('wagtailadmin_workflows:task_chooser') + '?' + request.GET.urlencode() if create_model else None
+        }, json_data=get_chooser_context())
+
+
+def task_chosen(request, task_id):
+    task = get_object_or_404(Task, id=task_id)
+
+    return render_modal_workflow(
+        request, None, None,
+        None, json_data={'step': 'task_chosen', 'result': get_task_result_data(task)}
+    )
+
+
+@task_permission_checker.require('add')
+def task_edit(request, task_id):
+    task = get_object_or_404(Task, id=task_id).specific
+
+    edit_handler = task.get_edit_handler()
+    edit_handler = edit_handler.bind_to(request=request)
+    form_class = edit_handler.get_form_class()
+
+    if request.method == 'POST':
+        form = form_class(request.POST, request.FILES, instance=task, prefix='edit-task')
+
+        if form.is_valid():
+            task = form.save()
+
+            return render_modal_workflow(
+                request, None, None,
+                None, json_data={'step': 'task_chosen', 'result': get_task_result_data(task)}
+            )
+    else:
+        form = form_class(instance=task, prefix='edit-task')
+
+    return render_modal_workflow(
+        request, 'wagtailadmin/workflows/task_chooser/edit.html', None,
+        {
+            'task': task,
+            'form': form,
+            'edit_url': reverse('wagtailadmin_workflows:task_edit', args=[task.id]),
+        },
+        json_data=get_chooser_context()
+    )
