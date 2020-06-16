@@ -442,7 +442,7 @@ class TestSubmitToWorkflow(TestCase, WagtailTestUtils):
         response = self.client.get(edit_url)
         workflow_status_url = reverse('wagtailadmin_pages:workflow_status', args=(self.page.id, ))
         self.assertContains(response, workflow_status_url)
-        self.assertContains(response, 'Awaiting\n        \n        {}'.format(self.page.current_workflow_task.name))
+        self.assertRegex(response.content.decode('utf-8'), r'Awaiting[\s|\n]+{}'.format(self.page.current_workflow_task.name))
         self.assertNotContains(response, 'Draft')
 
     @mock.patch.object(EmailMultiAlternatives, 'send', side_effect=IOError('Server down'))
@@ -1207,12 +1207,10 @@ class TestWorkflowStatus(TestCase, WagtailTestUtils):
 
         self.submit()
         response = self.client.get(self.edit_url)
-        self.assertContains(response,
-                            "Awaiting\n                \n            \n            {}".format(self.task_1.name))
+        self.assertRegex(response.content.decode('utf-8'), r'Awaiting[\s|\n]+{}'.format(self.task_1.name))
 
         response = self.workflow_action('approve')
-        self.assertContains(response,
-                            "Awaiting\n                \n            \n            {}".format(self.task_2.name))
+        self.assertRegex(response.content.decode('utf-8'), r'Awaiting[\s|\n]+{}'.format(self.task_2.name))
 
         response = self.workflow_action('reject')
         self.assertContains(response, 'Changes requested')
@@ -1220,8 +1218,7 @@ class TestWorkflowStatus(TestCase, WagtailTestUtils):
         # resubmit
         self.submit()
         response = self.client.get(self.edit_url)
-        self.assertContains(response,
-                            "Awaiting\n                \n            \n            {}".format(self.task_2.name))
+        self.assertRegex(response.content.decode('utf-8'), r'Awaiting[\s|\n]+{}'.format(self.task_2.name))
 
         response = self.workflow_action('approve')
         self.assertContains(response, 'Published')
@@ -1236,11 +1233,8 @@ class TestWorkflowStatus(TestCase, WagtailTestUtils):
     def test_status_after_restart(self):
         self.submit()
         response = self.workflow_action('approve')
-        self.assertContains(response,
-                            "Awaiting\n                \n            \n            {}".format(self.task_2.name))
-
+        self.assertRegex(response.content.decode('utf-8'), r'Awaiting[\s|\n]+{}'.format(self.task_2.name))
         self.workflow_action('reject')
         self.submit('action-restart-workflow')
         response = self.client.get(self.edit_url)
-        self.assertContains(response,
-                            "Awaiting\n                \n            \n            {}".format(self.task_1.name))
+        self.assertRegex(response.content.decode('utf-8'), r'Awaiting[\s|\n]+{}'.format(self.task_1.name))
