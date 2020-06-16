@@ -781,14 +781,15 @@ class TestPageEdit(TestCase, WagtailTestUtils):
 
         response = self.client.get(reverse('wagtailadmin_pages:edit', args=(self.child_page.id, )))
 
-        link_to_draft = '<a href="/revised-slug-in-draft-only/" target="_blank" rel="noopener noreferrer" class="status-tag primary" title="Visit the live page"><span class="visuallyhidden">Current page status:</span> live + draft</a>'
-        link_to_live = '<a href="/hello-world/" target="_blank" rel="noopener noreferrer" class="status-tag primary" title="Visit the live page"><span class="visuallyhidden">Current page status:</span> live + draft</a>'
+        link_to_live = '<a href="/hello-world/" target="_blank" rel="noopener noreferrer" class="button button-small button-nostroke live" title="Visit the live page">\n' \
+                       '<svg class="icon icon-link-external initial" aria-hidden="true" focusable="false"><use href="#icon-link-external"></use></svg>\n\n        ' \
+                       'Live\n        <span class="privacy-indicator-tag u-hidden" aria-hidden="true">(restricted)</span>'
         input_field_for_draft_slug = '<input type="text" name="slug" value="revised-slug-in-draft-only" id="id_slug" maxlength="255" required />'
         input_field_for_live_slug = '<input type="text" name="slug" value="hello-world" id="id_slug" maxlength="255" required />'
 
         # Status Link should be the live page (not revision)
         self.assertContains(response, link_to_live, html=True)
-        self.assertNotContains(response, link_to_draft, html=True)
+        self.assertNotContains(response, 'href="/revised-slug-in-draft-only/"', html=True)
 
         # Editing input for slug should be the draft revision
         self.assertContains(response, input_field_for_draft_slug, html=True)
@@ -804,14 +805,15 @@ class TestPageEdit(TestCase, WagtailTestUtils):
 
         response = self.client.get(reverse('wagtailadmin_pages:edit', args=(self.single_event_page.id, )))
 
-        link_to_draft = '<a href="/revised-slug-in-draft-only/pointless-suffix/" target="_blank" rel="noopener noreferrer" class="status-tag primary" title="Visit the live page"><span class="visuallyhidden">Current page status:</span> live + draft</a>'
-        link_to_live = '<a href="/mars-landing/pointless-suffix/" target="_blank" rel="noopener noreferrer" class="status-tag primary" title="Visit the live page"><span class="visuallyhidden">Current page status:</span> live + draft</a>'
+        link_to_live = '<a href="/mars-landing/pointless-suffix/" target="_blank" rel="noopener noreferrer" class="button button-small button-nostroke live" title="Visit the live page">\n' \
+                       '<svg class="icon icon-link-external initial" aria-hidden="true" focusable="false"><use href="#icon-link-external"></use></svg>\n\n        ' \
+                       'Live\n        <span class="privacy-indicator-tag u-hidden" aria-hidden="true">(restricted)</span>'
         input_field_for_draft_slug = '<input type="text" name="slug" value="revised-slug-in-draft-only" id="id_slug" maxlength="255" required />'
         input_field_for_live_slug = '<input type="text" name="slug" value="mars-landing" id="id_slug" maxlength="255" required />'
 
         # Status Link should be the live page (not revision)
         self.assertContains(response, link_to_live, html=True)
-        self.assertNotContains(response, link_to_draft, html=True)
+        self.assertNotContains(response, 'href="/revised-slug-in-draft-only/pointless-suffix/"', html=True)
 
         # Editing input for slug should be the draft revision
         self.assertContains(response, input_field_for_draft_slug, html=True)
@@ -938,12 +940,12 @@ class TestPageEdit(TestCase, WagtailTestUtils):
 
         publish_button = '''
             <button type="submit" name="action-publish" value="action-publish" class="button button-longrunning " data-clicked-text="Publishing…">
-                <span class="icon icon-spinner"></span><em>Publish</em>
+                <svg class="icon icon-spinner icon" aria-hidden="true" focusable="false"><use href="#icon-spinner"></use></svg><em>Publish</em>
             </button>
         '''
         save_button = '''
             <button type="submit" class="button action-save button-longrunning " data-clicked-text="Saving…" >
-                <span class="icon icon-spinner"></span><em>Save draft</em>
+                <svg class="icon icon-spinner icon" aria-hidden="true" focusable="false"><use href="#icon-spinner"></use></svg><em>Save draft</em>
             </button>
         '''
 
