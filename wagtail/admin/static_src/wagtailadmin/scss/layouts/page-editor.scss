@@ -35,13 +35,15 @@
         }
     }
 
-    .header-title {
-        padding-left: 0;
-
-        h1 {
-            font-size: 1.915em;  // approximately 26px
+    h1 {
+        font-size: 1.915em;  // approximately 26px
+        &.header-title {
             text-transform: initial;
         }
+    }
+
+    .header-title {
+        padding-left: 0;
     }
 
     .modal-body .header-title h1 {
