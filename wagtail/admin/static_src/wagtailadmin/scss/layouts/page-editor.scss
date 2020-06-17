@@ -86,7 +86,8 @@
             font-size: 1em;
             margin-top: -.25em; // Account for the button border
             overflow: auto;
-            line-height: 2em;
+            height: 2.5em;
+            line-height: 2.5em;
         }
 
         .action-workflow-status {
@@ -564,14 +565,16 @@ footer .preview {
 
 .button.button--live {
     background-color: $color-white;
-    color: $color-teal-dark;
+    color: $color-teal;
+    border-radius: 2px;
+    font-size: 14px;
     font-weight: 600;
-    line-height: 2.5em;
-    padding: 0 0.8em;
+    line-height: 2.3em;
+    padding: 0 0.75em;
 
     .icon {
         @include svg-icon(1.25em);
-        margin-right: 0.4em;
+        margin-right: 0.25em;
     }
 
     &:hover {
