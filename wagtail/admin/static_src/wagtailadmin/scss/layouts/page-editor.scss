@@ -37,12 +37,22 @@
 
     .header-title {
         padding-left: 0;
+
+        h1 {
+            font-size: 1.915em;  // approximately 26px
+            text-transform: initial;
+        }
+    }
+
+    .modal-body .header-title h1 {
+        font-size: 1.5em;
     }
 
     .header-meta {
         list-style: none;
         margin-top: 0;
         margin-bottom: 0;
+        padding: 0;
 
         li {
             border: none;
